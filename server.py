@@ -1,27 +1,18 @@
-import os.path
-
-from aiohttp import web
-import aiofiles
-
+import os
+import logging
 import asyncio
 import datetime
 
+import aiofiles
+from aiohttp import web
+
+
+logging.basicConfig(
+    format=u'[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s',
+    level=logging.INFO)
 
 INTERVAL_SECS = 1
-BYTES = 102400
-
-
-async def uptime_handler(request):
-    response = web.StreamResponse()
-    response.headers['Content-Type'] = 'text/html'
-    await response.prepare(request)
-
-    while True:
-        formatted_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        message = f'{formatted_date}<br>'
-        await response.write(message.encode('utf-8'))
-
-        await asyncio.sleep(INTERVAL_SECS)
+BYTES = 512000
 
 
 async def archive(request):
@@ -39,11 +30,16 @@ async def archive(request):
     args = ['zip', '-r', '-', archive_hash]
     process = await asyncio.create_subprocess_exec(
         *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd='test_photos')
-    while not process.stdout.at_eof():
-        archive_data = await process.stdout.read(BYTES)
-        await response.write(archive_data)
-
-    await response.write_eof()
+    try:
+        while not process.stdout.at_eof():
+            archive_data = await process.stdout.read(BYTES)
+            logging.info(f'Sending {archive_hash} archive chunk')
+            await response.write(archive_data)
+        await response.write_eof()
+    finally:
+        process.kill()
+        await process.communicate()
+        logging.error('Download was interrupted')
     return response
 
 
