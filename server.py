@@ -1,23 +1,22 @@
 import os
 import logging
 import asyncio
-import datetime
+import argparse
+from pathlib import Path
+from functools import partial
 
 import aiofiles
 from aiohttp import web
 
 
-logging.basicConfig(
-    format=u'[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s',
-    level=logging.INFO)
+logger = logging.getLogger(__file__)
 
-INTERVAL_SECS = 1
 BYTES = 512000
 
 
-async def archive(request):
+async def archive(request, sleep_duration, photos_dir):
     archive_hash = request.match_info.get('archive_hash')
-    if not os.path.exists(os.path.join('test_photos', archive_hash)):
+    if not os.path.exists(os.path.join(photos_dir, archive_hash)):
         raise web.HTTPNotFound(text=f'404 Архив {archive_hash} не существует или был удален')
     response = web.StreamResponse(
         headers={
@@ -29,17 +28,23 @@ async def archive(request):
 
     args = ['zip', '-r', '-', archive_hash]
     process = await asyncio.create_subprocess_exec(
-        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd='test_photos')
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=photos_dir)
     try:
         while not process.stdout.at_eof():
             archive_data = await process.stdout.read(BYTES)
-            logging.info(f'Sending {archive_hash} archive chunk')
+            logger.info(f'Sending {archive_hash} archive chunk')
+            if sleep_duration:
+                await asyncio.sleep(sleep_duration)
             await response.write(archive_data)
+
         await response.write_eof()
+        logger.info(f'{archive_hash} archive was successfully downloaded')
+        await process.wait()  # ждать пока zip завершит процесс
     finally:
-        process.kill()
-        await process.communicate()
-        logging.error('Download was interrupted')
+        if process.returncode is None:
+            process.kill()
+            await process.communicate()
+            logger.error('Download was interrupted')
     return response
 
 
@@ -49,10 +54,33 @@ async def handle_index_page(request):
     return web.Response(text=index_contents, content_type='text/html')
 
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--logs', action='store_true', help='Включить логирование')
+    parser.add_argument(
+        '-s',
+        '--sleep',
+        type=int,
+        default=0,
+        help='Длительность задержки ответа (сек)',
+    )
+    parser.add_argument(
+        '-p', '--path', type=Path, default='test_photos', help='Путь к директории с фото')
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.ERROR)
+    if args.logs:
+        logger.setLevel(logging.INFO)
+
+    archive_handler = partial(archive, sleep_duration=args.sleep, photos_dir=args.path)
+
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),
-        web.get('/archive/{archive_hash}/', archive),
+        web.get('/archive/{archive_hash}/', archive_handler),
     ])
     web.run_app(app)
+
+
+if __name__ == '__main__':
+    main()
