@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    container_name: async_download_service
+    command: sh -c "python3 server.py -l"
+    volumes:
+      - .:/async-download-service/
+    restart: 'no'
+    ports:
+      - "8080:8080"
