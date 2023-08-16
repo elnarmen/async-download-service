@@ -20,34 +20,37 @@
 ```
 
 
-## Как установить
+## Установка и запуск
 
 Для работы микросервиса нужен Python версии не ниже 3.6.
 
+Склонируйте репозиторий:
 ```bash
-pip install -r requirements.txt
+https://github.com/elnarmen/async-download-service.git
 ```
 
-## Как запустить
+Скачайте и соберите докер-образы с помощью Docker Сompose:
 
-```bash
-python server.py
+```shell
+$ docker compose pull --ignore-buildable
+$ docker compose build
+```
+Запустите докер-контейнеры и не выключайте:
+
+```shell
+docker compose up
+
+[+] Running 1/1
+ ✔ Container async_download_service  Recreated                                                                                                              0.2s 
+Attaching to async_download_service
+async_download_service  | ======== Running on http://0.0.0.0:8080 ========
+async_download_service  | (Press CTRL+C to quit)
 ```
 
-Сервер запустится на порту 8080, чтобы проверить его работу перейдите в браузере на страницу [http://127.0.0.1:8080/](http://127.0.0.1:8080/).
+Сервер запустится на порту 8080, чтобы проверить его работу перейдите в браузере на страницу [http://0.0.0.0:8080/](http://0.0.0.0:8080/).<br>
+Все файлы из каталога `async-download-service` смонтированы в docker-контейнер, поэтому все изменения кода будут
+появляться и в контейнере
 
-## Как развернуть на сервере
-
-```bash
-python server.py
-```
-
-После этого перенаправить на микросервис запросы, начинающиеся с `/archive/`. Например:
-
-```
-GET http://host.ru/archive/3bea29ccabbbf64bdebcc055319c5745/
-GET http://host.ru/archive/af1ad8c76fda2e48ea9aed2937e972ea/
-```
 
 # Цели проекта
 
