@@ -15,7 +15,7 @@ BYTES = 512000
 
 
 async def archive(request, sleep_duration, photos_dir):
-    archive_hash = request.match_info.get('archive_hash')
+    archive_hash = request.match_info['archive_hash']
     if not os.path.exists(os.path.join(photos_dir, archive_hash)):
         raise web.HTTPNotFound(text=f'404 Архив {archive_hash} не существует или был удален')
     response = web.StreamResponse(
